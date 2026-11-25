@@ -455,6 +455,55 @@
     color: var(--accent-soft);
     letter-spacing: 0.1em;
   }
+  /* ========== V2.0 分享功能 ========== */
+.share-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+  margin-top: 18px;
+}
+
+.share-actions .btn {
+  width: 100%;
+  padding: 13px 10px;
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+}
+
+.share-actions .btn-download {
+  background: linear-gradient(135deg, #d4af6a, #a9813e);
+  color: #0b0e1a;
+  font-weight: 700;
+}
+
+.share-actions .btn-download::after {
+  display: none;
+}
+
+.share-actions .btn-download:hover {
+  box-shadow: 0 0 25px rgba(212,175,106,.4);
+}
+
+.share-actions .btn-copy {
+  grid-column: 1 / -1;
+}
+
+.share-status {
+  min-height: 22px;
+  color: #d4af6a;
+  text-align: center;
+  font-size: 0.78rem;
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+@media (max-width: 420px) {
+  .share-actions .btn {
+    font-size: 0.82rem;
+    padding: 12px 6px;
+  }
+}
 
   /* ---------- 响应式 ---------- */
   @media (max-width: 420px) {
@@ -550,6 +599,25 @@
         <div class="cp-divider"></div>
         <div class="cp-traits" id="cp-traits"></div>
       </div>
+            <!-- V2.0 分享功能 -->
+      <div class="share-actions">
+        <button class="btn btn-download" id="btn-download-card">
+          ↓ 下载结果图片
+        </button>
+
+        <button class="btn" id="btn-share-card">
+          ↗ 分享我的结果
+        </button>
+
+        <button class="btn ghost btn-copy" id="btn-copy-link">
+          复制测试链接
+        </button>
+      </div>
+
+      <p class="share-status"
+         id="share-status"
+         role="status"
+         aria-live="polite"></p>
     </div>
   </section>
 
@@ -1018,9 +1086,272 @@ function calculateResult() {
   });
   return GIFTS[maxKey];
 }
+  /* ==========================================
+   V2.0：生成专属 PNG 分享卡片
+   ========================================== */
+
+let currentGiftForShare = null;
+
+const SHARE_URL = 'https://wangbin-eye.github.io/huaidan/';
+
+function createShareImage(gift) {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = 1080;
+    canvas.height = 1350;
+
+    const W = canvas.width;
+    const H = canvas.height;
+    const accent = gift.theme.accent || '#d4af6a';
+    const soft = gift.theme.soft || '#e8cf9a';
+
+    // 深色渐变背景
+    const bg = ctx.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, '#171c2d');
+    bg.addColorStop(0.55, '#0b0e1a');
+    bg.addColorStop(1, '#15101c');
+
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // 金色边框
+    ctx.strokeStyle = 'rgba(212,175,106,0.75)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(35, 35, W - 70, H - 70);
+
+    ctx.strokeStyle = 'rgba(212,175,106,0.25)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(52, 52, W - 104, H - 104);
+
+    // 顶部装饰光晕
+    const glow = ctx.createRadialGradient(
+      W / 2, 300, 10,
+      W / 2, 300, 480
+    );
+    glow.addColorStop(0, 'rgba(212,175,106,0.15)');
+    glow.addColorStop(1, 'rgba(212,175,106,0)');
+
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, 800);
+
+    // 绘制文字
+    function centerText(text, y, size, color, weight = 400) {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = color;
+      ctx.font = `${weight} ${size}px "Microsoft YaHei", "PingFang SC", sans-serif`;
+      ctx.fillText(text, W / 2, y);
+    }
+
+    // 自动换行
+    function drawWrapped(text, y, maxWidth, lineHeight, size, color) {
+      ctx.font = `${size}px "Microsoft YaHei", "PingFang SC", sans-serif`;
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      let line = '';
+      let currentY = y;
+
+      for (const char of text) {
+        const testLine = line + char;
+
+        if (ctx.measureText(testLine).width > maxWidth && line) {
+          ctx.fillText(line, W / 2, currentY);
+          line = char;
+          currentY += lineHeight;
+        } else {
+          line = testLine;
+        }
+      }
+
+      if (line) {
+        ctx.fillText(line, W / 2, currentY);
+        currentY += lineHeight;
+      }
+
+      return currentY;
+    }
+
+    // 顶部标题
+    centerText(
+      'SEVEN GIFTS · SOUL QUIZ',
+      160, 28, '#d4af6a', 500
+    );
+
+    centerText(
+      '你的灵魂对应哪一道七恩赐？',
+      235, 38, '#f0ead8', 500
+    );
+
+    // 装饰符号
+    centerText('✧', 390, 105, accent, 400);
+
+    // 恩赐名称
+    centerText(gift.name, 550, 104, accent, 700);
+
+    centerText(
+      gift.en,
+      630, 25, '#a8a090', 400
+    );
+
+    // 装饰线
+    ctx.fillStyle = 'rgba(212,175,106,0.65)';
+    ctx.fillRect(420, 690, 240, 2);
+
+    // 结果寄语
+    drawWrapped(
+      '「' + gift.tagline + '」',
+      770, 820, 58, 32, soft
+    );
+
+    // 特征标签
+    drawWrapped(
+      gift.chips.join('  ·  '),
+      980, 850, 48, 27, '#d4af6a'
+    );
+
+    // 底部品牌和网址
+    ctx.fillStyle = 'rgba(212,175,106,0.35)';
+    ctx.fillRect(250, 1110, 580, 1);
+
+    centerText(
+      '七恩赐 · 灵魂测试',
+      1170, 27, '#d4af6a', 500
+    );
+
+    centerText(
+      '趣味娱乐测试 · 结果仅供参考',
+      1225, 22, '#a8a090', 400
+    );
+
+    centerText(
+      '点击链接，测测你的灵魂对应哪一道七恩赐',
+      1270, 21, '#a8a090', 400
+    );
+
+    try {
+      canvas.toBlob(blob => {
+        if (blob) resolve(blob);
+        else reject(new Error('图片生成失败'));
+      }, 'image/png');
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+// 下载专属图片
+async function downloadShareCard() {
+  if (!currentGiftForShare) return;
+
+  const status = document.getElementById('share-status');
+
+  try {
+    status.textContent = '正在生成你的专属图片……';
+
+    const blob = await createShareImage(currentGiftForShare);
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = '我的七恩赐测试结果.png';
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+
+    status.textContent = '图片已生成，请查看下载文件夹。';
+  } catch (error) {
+    console.error(error);
+    status.textContent = '图片生成失败，请稍后重试。';
+  }
+}
+
+// 分享图片
+async function shareResultCard() {
+  if (!currentGiftForShare) return;
+
+  const status = document.getElementById('share-status');
+
+  try {
+    status.textContent = '正在准备分享……';
+
+    const blob = await createShareImage(currentGiftForShare);
+
+    const file = new File(
+      [blob],
+      '我的七恩赐测试结果.png',
+      { type: 'image/png' }
+    );
+
+    // 支持文件分享的手机浏览器
+    if (
+      navigator.share &&
+      navigator.canShare &&
+      navigator.canShare({ files: [file] })
+    ) {
+      await navigator.share({
+        title: '我的七恩赐测试结果',
+        text: '我测出了自己的灵魂恩赐，你也来测测吧！',
+        files: [file]
+      });
+
+      status.textContent = '分享已完成。';
+    } else if (navigator.share) {
+      // 不支持分享图片时，至少分享文字和链接
+      await navigator.share({
+        title: '我的七恩赐测试结果',
+        text: '我的结果是：' +
+          currentGiftForShare.name +
+          '。你也来测测吧！',
+        url: SHARE_URL
+      });
+
+      status.textContent = '分享已完成。';
+    } else {
+      // 桌面浏览器不支持系统分享时，自动下载图片
+      await downloadShareCard();
+      status.textContent = '当前浏览器不支持直接分享，已为你生成图片。';
+    }
+  } catch (error) {
+    if (error.name !== 'AbortError') {
+      console.error(error);
+      status.textContent = '分享暂时不可用，请使用下载图片功能。';
+    }
+  }
+}
+
+// 复制测试链接
+async function copyTestLink() {
+  const status = document.getElementById('share-status');
+
+  try {
+    await navigator.clipboard.writeText(SHARE_URL);
+    status.textContent = '测试链接已复制，快发给朋友吧！';
+  } catch (error) {
+    // 兼容部分浏览器
+    window.prompt('请复制下面的测试链接：', SHARE_URL);
+  }
+}
+
+// 绑定按钮
+document.getElementById('btn-download-card')
+  .addEventListener('click', downloadShareCard);
+
+document.getElementById('btn-share-card')
+  .addEventListener('click', shareResultCard);
+
+document.getElementById('btn-copy-link')
+  .addEventListener('click', copyTestLink);
 
 function showResult() {
   const gift = calculateResult();
+  currentGiftForShare = gift;
   const t = gift.theme;
   const sr = $('screen-result');
   sr.style.setProperty('--accent', t.accent);
